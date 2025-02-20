@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bushrealm Adventure</title>
+    <style>
+        body { font-family: 'Courier New', monospace; background: #1a1a1a; color: #d4d4d4; text-align: center; margin: 0; padding: 0; }
+        #game { max-width: 800px; margin: 20px auto; display: flex; flex-direction: column; align-items: center; }
+        canvas { border: 1px solid #4a2f1a; background: #2f1a0d; }
+        #text { margin: 10px 0; font-size: 18px; white-space: pre-wrap; }
+        #inventory, #equipment { margin: 10px 0; display: grid; grid-template-columns: repeat(4, 60px); gap: 5px; padding: 10px; background: #2f1a0d; border: 1px solid #4a2f1a; }
+        .item, .slot { width: 50px; height: 50px; background: #4a2f1a; border: 1px solid #a68b5c; display: flex; align-items: center; justify-content: center; font-size: 12px; cursor: move; }
+        .item.dragging { opacity: 0.5; }
+        .slot.empty { background: #2f1a0d; color: #808080; }
+        #input { width: 300px; padding: 10px; background: #2f1a0d; color: #d4d4d4; border: 1px solid #a68b5c; font-family: 'Courier New'; margin: 10px 0; }
+        #input:focus { outline: none; background: #4a2f1a; }
+        #map { border: 1px solid #4a2f1a; background: #2f1a0d; margin: 10px 0; }
+        .character-select { margin: 20px 0; }
+        .character-select button { padding: 10px 20px; margin: 5px; background: #4a2f1a; color: #d4d4d4; border: 1px solid #a68b5c; cursor: pointer; }
+        .character-select button:hover { background: #6b4527; }
+        .character-select canvas { vertical-align: middle; margin-left: 10px; }
+    </style>
+</head>
+<body>
+    <div id="game">
+        <canvas id="pixelArt" width="400" height="200"></canvas>
+        <div id="text">Welcome to Bushrealm, land of adventure!</div>
+        <div id="character-select" class="character-select">
+            <button id="cresto"><canvas id="crestoIcon" width="32" height="32"></canvas> Cresto – Knight of the Sunken Marshes</button>
+            <button id="wren"><canvas id="wrenIcon" width="32" height="32"></canvas> Wren – Bard of the Verdant Glades</button>
+            <button id="caseadilla"><canvas id="caseadillaIcon" width="32" height="32"></canvas> Caseadilla – Warrior of the Mistpeak Range</button>
+            <button id="sterguy"><canvas id="sterguyIcon" width="32" height="32"></canvas> Sterguy – Smith of the Emberforge Cliffs</button>
+            <button id="gamblinEddie"><canvas id="gamblinEddieIcon" width="32" height="32"></canvas> Gamblin Eddie – Rogue of the Ironclad Vale</button>
+            <button id="taterSalad"><canvas id="taterSaladIcon" width="32" height="32"></canvas> Tater_Salad – Farmer of the Rootvale Fields</button>
+            <button id="noodles"><canvas id="noodlesIcon" width="32" height="32"></canvas> Noodles – Adventurer of the Rolling Plains</button>
+            <button id="chunks"><canvas id="chunksIcon" width="32" height="32"></canvas> Chunks – Ranger of the Frostfang Highlands</button>
+        </div>
+        <div id="inventory"></div>
+        <div id="equipment">
+            <div class="slot" id="weaponSlot">Weapon: <span class="empty">?</span></div>
+            <div class="slot" id="armorSlot">Armor: <span class="empty">?</span></div>
+            <div class="slot" id="accessorySlot">Accessory: <span class="empty">?</span></div>
+        </div>
+        <canvas id="map" width="400" height="200"></canvas>
+        <input id="input" type="text" placeholder="Type your action..." autocomplete="off">
+    </div>
+    <script>
+        const canvas = document.getElementById('pixelArt');
+        const ctx = canvas.getContext('2d');
+        const mapCanvas = document.getElementById('map');
+        const mapCtx = mapCanvas.getContext('2d');
+        const textDiv = document.getElementById('text');
+        const invDiv = document.getElementById('inventory');
+        const equipDiv = document.getElementById('equipment');
+        const input = document.getElementById('input');
+        const charSelect = document.getElementById('character-select');
+
+        let currentScene = 'select';
+        let player = { position: { x: 0, y: 0 }, gear: {}, inventory: [], abilities: [] };
+        const biomes = {
+            frostfang: { x: 100, y: 100, color: '#e0f0ff', name: 'Frostfang Highlands' },
+            sunken: { x: 300, y: 150, color: '#2f4f2f', name: 'Sunken Marshes' },
+            mistpeak: { x: 200, y: 50, color: '#808080', name: 'Mistpeak Range' },
+            rolling: { x: 0, y: 150, color: '#8b4513', name: 'Rolling Plains' },
+            verdant: { x: 400, y: 100, color: '#228b22', name: 'Verdant Glades' },
+            emberforge: { x: 500, y: 150, color: '#8b0000', name: 'Emberforge Cliffs' },
+            rootvale: { x: 600, y: 100, color: '#d2b48c', name: 'Rootvale Fields' },
+            thornwick: { x: 250, y: 150, color: '#4a2f1a', name: 'Thornwick' }
+        };
+
+        const characters = {
+            cresto: { name: 'Cresto', region: 'sunken', gear: { weapon: 'Sunblade', armor: 'Marshscale Armor' }, abilities: ['Swamp Stride', 'Gator Whisper'] },
+            wren: { name: 'Wren', region: 'verdant', gear: { weapon: 'Lute of Shaft', armor: 'Evergreen Cloak', accessory: 'Fishhook Trap' }, abilities: ['Harmony Haste', 'Fishhook Trap'] },
+            caseadilla: { name: 'Caseadilla', region: 'mistpeak', gear: { weapon: 'Thunderaxe', armor: 'Raincloak' }, abilities: ['Forest Tactics', 'Raincloak Stealth'] },
+            sterguy: { name: 'Sterguy', region: 'emberforge', gear: { weapon: 'Molten Hammer', armor: 'Emberplate Armor' }, abilities: ['Forge Fury', 'Heat Hammer'] },
+            gamblinEddie: { name: 'Gamblin Eddie', region: 'ironclad', gear: { weapon: 'Smokesteel Dagger', accessory: 'Iron Dice' }, abilities: ['Lucky Gambit', 'Smoke Cloak'] },
+            taterSalad: { name: 'Tater_Salad', region: 'rootvale', gear: { weapon: 'Tater Targe', armor: 'Dirtcloak' }, abilities: ['Spud Shield', 'Harvest Haste'] },
+            noodles: { name: 'Noodles', region: 'rolling', gear: { weapon: 'Cue of Shame', armor: 'Tattered Cloth' }, abilities: ['Swift Roll', 'Lucky Break'] },
+            chunks: { name: 'Chunks', region: 'frostfang', gear: { weapon: 'Frostbite Bow', armor: 'Snowbear Pelt' }, abilities: ['Icy Tracking', 'Frost Resilience'] }
+        };
+
+        // Pixel art for characters
+        function drawCharacterIcon(ctx, char, x, y) {
+            ctx.fillStyle = '#a68b5c';
+            ctx.fillRect(x, y, 16, 24); // Body
+            if (char.gear.weapon === 'Sunblade') ctx.fillStyle = '#ffd700'; // Gold for Sunblade
+            else if (char.gear.weapon === 'Lute of Shaft') ctx.fillStyle = '#d4a017'; // Brown for lute
+            else if (char.gear.weapon === 'Thunderaxe') ctx.fillStyle = '#808080'; // Gray for axe
+            else if (char.gear.weapon === 'Molten Hammer') ctx.fillStyle = '#ff4500'; // Red for hammer
+            else if (char.gear.weapon === 'Smokesteel Dagger') ctx.fillStyle = '#4a4a4a'; // Dark gray for dagger
+            else if (char.gear.weapon === 'Tater Targe') ctx.fillStyle = '#d2b48c'; // Brown for shield
+            else if (char.gear.weapon === 'Cue of Shame') ctx.fillStyle = '#808080'; // Gray for cue
+            else if (char.gear.weapon === 'Frostbite Bow') ctx.fillStyle = '#e0f0ff'; // Light blue for bow
+            ctx.fillRect(x + 8, y - 8, 8, 8); // Weapon/icon
+        }
+
+        // Draw character icons for selection
+        Object.keys(characters).forEach(char => {
+            const iconCanvas = document.getElementById(`${char}Icon`);
+            const iconCtx = iconCanvas.getContext('2d');
+            drawCharacterIcon(iconCtx, characters[char], 8, 8);
+        });
+
+        // Pixel art for items
+        const itemIcons = {
+            'Sunblade': { color: '#ffd700', shape: 'sword' },
+            'Marshscale Armor': { color: '#2f4f2f', shape: 'armor' },
+            'Lute of Shaft': { color: '#d4a017', shape: 'lute' },
+            'Evergreen Cloak': { color: '#228b22', shape: 'cloak' },
+            'Thunderaxe': { color: '#808080', shape: 'axe' },
+            'Raincloak': { color: '#808080', shape: 'cloak' },
+            'Molten Hammer': { color: '#ff4500', shape: 'hammer' },
+            'Emberplate Armor': { color: '#8b0000', shape: 'armor' },
+            'Smokesteel Dagger': { color: '#4a4a4a', shape: 'dagger' },
+            'Iron Dice': { color: '#ffd700', shape: 'dice' },
+            'Tater Targe': { color: '#d2b48c', shape: 'shield' },
+            'Dirtcloak': { color: '#8b4513', shape: 'cloak' },
+            'Cue of Shame': { color: '#808080', shape: 'cue' },
+            'Tattered Cloth': { color: '#a68b5c', shape: 'cloak' },
+            'Frostbite Bow': { color: '#e0f0ff', shape: 'bow' },
+            'Snowbear Pelt': { color: '#4a2f1a', shape: 'armor' },
+            'Stickball Sub': { color: '#d4a017', shape: 'sub' },
+            'Fried Fish': { color: '#d4a017', shape: 'fish' }
+        };
+
+        function drawItem(ctx, item, x, y) {
+            ctx.fillStyle = itemIcons[item]?.color || '#808080';
+            if (itemIcons[item]?.shape === 'sword') ctx.fillRect(x + 20, y + 10, 10, 30);
+            else if (itemIcons[item]?.shape === 'armor') ctx.fillRect(x + 15, y + 5, 20, 35);
+            else if (itemIcons[item]?.shape === 'lute') ctx.fillRect(x + 15, y + 15, 20, 20);
+            else if (itemIcons[item]?.shape === 'cloak') ctx.fillRect(x + 10, y + 10, 30, 25);
+            else if (itemIcons[item]?.shape === 'axe') ctx.fillRect(x + 20, y + 5, 10, 35);
+            else if (itemIcons[item]?.shape === 'hammer') ctx.fillRect(x + 20, y + 10, 10, 30);
+            else if (itemIcons[item]?.shape === 'dagger') ctx.fillRect(x + 22, y + 10, 6, 30);
+            else if (itemIcons[item]?.shape === 'dice') ctx.fillRect(x + 18, y + 15, 14, 14);
+            else if (itemIcons[item]?.shape === 'shield') ctx.fillRect(x + 15, y + 5, 20, 35);
+            else if (itemIcons[item]?.shape === 'cue') ctx.fillRect(x + 20, y + 10, 10, 30);
+            else if (itemIcons[item]?.shape === 'bow') ctx.fillRect(x + 15, y + 15,Sorry about that, something didn't go as planned. Please try again, and if you're still seeing this message, go ahead and restart the app.
