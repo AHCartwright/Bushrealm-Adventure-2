@@ -1,137 +1,554 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Bushrealm Adventure</title>
-    <style>
-        body { font-family: 'Courier New', monospace; background: #1a1a1a; color: #d4d4d4; text-align: center; margin: 0; padding: 0; }
-        #game { max-width: 800px; margin: 20px auto; display: flex; flex-direction: column; align-items: center; }
-        canvas { border: 1px solid #4a2f1a; background: #2f1a0d; }
-        #text { margin: 10px 0; font-size: 18px; white-space: pre-wrap; }
-        #inventory, #equipment { margin: 10px 0; display: grid; grid-template-columns: repeat(4, 60px); gap: 5px; padding: 10px; background: #2f1a0d; border: 1px solid #4a2f1a; }
-        .item, .slot { width: 50px; height: 50px; background: #4a2f1a; border: 1px solid #a68b5c; display: flex; align-items: center; justify-content: center; font-size: 12px; cursor: move; }
-        .item.dragging { opacity: 0.5; }
-        .slot.empty { background: #2f1a0d; color: #808080; }
-        #input { width: 300px; padding: 10px; background: #2f1a0d; color: #d4d4d4; border: 1px solid #a68b5c; font-family: 'Courier New'; margin: 10px 0; }
-        #input:focus { outline: none; background: #4a2f1a; }
-        #map { border: 1px solid #4a2f1a; background: #2f1a0d; margin: 10px 0; }
-        .character-select { margin: 20px 0; }
-        .character-select button { padding: 10px 20px; margin: 5px; background: #4a2f1a; color: #d4d4d4; border: 1px solid #a68b5c; cursor: pointer; }
-        .character-select button:hover { background: #6b4527; }
-        .character-select canvas { vertical-align: middle; margin-left: 10px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bushrealm Adventure!</title>
+  <style>
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      background-image: url('bushboyz_logo.png');
+      background-repeat: repeat;
+      background-size: 500px 500px;
+      color: #000000;
+      margin: 0;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: rgba(255, 255, 255, 0.9);
+      padding: 20px;
+      border: 2px solid #FFA500;
+      border-radius: 5px;
+    }
+    #game-text {
+      background: #FFA500;
+      padding: 15px;
+      border: 2px solid #000000;
+      margin-bottom: 15px;
+      height: 400px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      text-shadow: 1px 1px 1px #000000;
+    }
+    #input-form {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    #player-input {
+      flex-grow: 1;
+      padding: 8px;
+      background: #FFFFFF;
+      border: 2px solid #FFA500;
+      color: #000000;
+      font-family: inherit;
+      text-shadow: 1px 1px 1px #000000;
+    }
+    #player-input:focus {
+      outline: none;
+      border-color: #000000;
+    }
+    button {
+      padding: 8px 15px;
+      background: #FFA500;
+      border: 2px solid #000000;
+      color: #000000;
+      cursor: pointer;
+      font-family: inherit;
+      text-shadow: 1px 1px 1px #FFFFFF;
+    }
+    button:hover {
+      background: #CC8400;
+    }
+    .action-buttons {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    #status, #action-list, #map, #npcs {
+      margin-top: 10px;
+      color: #000000;
+      background: #FFFFFF;
+      padding: 10px;
+      border: 2px solid #FFA500;
+      text-shadow: 1px 1px 1px #000000;
+    }
+    #music-toggle {
+      margin-top: 10px;
+    }
+  </style>
+  <audio id="backgroundMusic" src="Sax_Final.mp3" loop></audio>
 </head>
 <body>
-    <div id="game">
-        <canvas id="pixelArt" width="400" height="200"></canvas>
-        <div id="text">Welcome to Bushrealm, land of adventure!</div>
-        <div id="character-select" class="character-select">
-            <button id="cresto"><canvas id="crestoIcon" width="32" height="32"></canvas> Cresto – Knight of the Sunken Marshes</button>
-            <button id="wren"><canvas id="wrenIcon" width="32" height="32"></canvas> Wren – Bard of the Verdant Glades</button>
-            <button id="caseadilla"><canvas id="caseadillaIcon" width="32" height="32"></canvas> Caseadilla – Warrior of the Mistpeak Range</button>
-            <button id="sterguy"><canvas id="sterguyIcon" width="32" height="32"></canvas> Sterguy – Smith of the Emberforge Cliffs</button>
-            <button id="gamblinEddie"><canvas id="gamblinEddieIcon" width="32" height="32"></canvas> Gamblin Eddie – Rogue of the Ironclad Vale</button>
-            <button id="taterSalad"><canvas id="taterSaladIcon" width="32" height="32"></canvas> Tater_Salad – Farmer of the Rootvale Fields</button>
-            <button id="noodles"><canvas id="noodlesIcon" width="32" height="32"></canvas> Noodles – Adventurer of the Rolling Plains</button>
-            <button id="chunks"><canvas id="chunksIcon" width="32" height="32"></canvas> Chunks – Ranger of the Frostfang Highlands</button>
-        </div>
-        <div id="inventory"></div>
-        <div id="equipment">
-            <div class="slot" id="weaponSlot">Weapon: <span class="empty">?</span></div>
-            <div class="slot" id="armorSlot">Armor: <span class="empty">?</span></div>
-            <div class="slot" id="accessorySlot">Accessory: <span class="empty">?</span></div>
-        </div>
-        <canvas id="map" width="400" height="200"></canvas>
-        <input id="input" type="text" placeholder="Type your action..." autocomplete="off">
-    </div>
-    <script>
-        const canvas = document.getElementById('pixelArt');
-        const ctx = canvas.getContext('2d');
-        const mapCanvas = document.getElementById('map');
-        const mapCtx = mapCanvas.getContext('2d');
-        const textDiv = document.getElementById('text');
-        const invDiv = document.getElementById('inventory');
-        const equipDiv = document.getElementById('equipment');
-        const input = document.getElementById('input');
-        const charSelect = document.getElementById('character-select');
+  <div class="container">
+    <h1 style="color: #FFA500; text-shadow: 2px 2px 2px #000000;">Bushrealm Adventure!</h1>
+    <div id="game-text">Welcome to Bushrealm Adventure! Choose a character by typing 'select [name]' from: Cresto, Wren, Chunks, Gamblin’ Eddie, Caseadilla, Noodles, Nameistom, DomeXplosion.</div>
+    <form id="input-form">
+      <input type="text" id="player-input" placeholder="Enter your command (e.g., 'go wilds', 'fight')">
+      <button type="submit">Submit</button>
+    </form>
+    <div class="action-buttons"></div>
+    <div id="action-list"></div>
+    <div id="map"></div>
+    <div id="npcs"></div>
+    <button id="music-toggle">Enable Background Music</button>
+  </div>
 
-        let currentScene = 'select';
-        let player = { position: { x: 0, y: 0 }, gear: {}, inventory: [], abilities: [] };
-        const biomes = {
-            frostfang: { x: 100, y: 100, color: '#e0f0ff', name: 'Frostfang Highlands' },
-            sunken: { x: 300, y: 150, color: '#2f4f2f', name: 'Sunken Marshes' },
-            mistpeak: { x: 200, y: 50, color: '#808080', name: 'Mistpeak Range' },
-            rolling: { x: 0, y: 150, color: '#8b4513', name: 'Rolling Plains' },
-            verdant: { x: 400, y: 100, color: '#228b22', name: 'Verdant Glades' },
-            emberforge: { x: 500, y: 150, color: '#8b0000', name: 'Emberforge Cliffs' },
-            rootvale: { x: 600, y: 100, color: '#d2b48c', name: 'Rootvale Fields' },
-            thornwick: { x: 250, y: 150, color: '#4a2f1a', name: 'Thornwick' }
-        };
+  <script>
+    localStorage.clear();
+    console.log('Local storage cleared');
 
-        const characters = {
-            cresto: { name: 'Cresto', region: 'sunken', gear: { weapon: 'Sunblade', armor: 'Marshscale Armor' }, abilities: ['Swamp Stride', 'Gator Whisper'] },
-            wren: { name: 'Wren', region: 'verdant', gear: { weapon: 'Lute of Shaft', armor: 'Evergreen Cloak', accessory: 'Fishhook Trap' }, abilities: ['Harmony Haste', 'Fishhook Trap'] },
-            caseadilla: { name: 'Caseadilla', region: 'mistpeak', gear: { weapon: 'Thunderaxe', armor: 'Raincloak' }, abilities: ['Forest Tactics', 'Raincloak Stealth'] },
-            sterguy: { name: 'Sterguy', region: 'emberforge', gear: { weapon: 'Molten Hammer', armor: 'Emberplate Armor' }, abilities: ['Forge Fury', 'Heat Hammer'] },
-            gamblinEddie: { name: 'Gamblin Eddie', region: 'ironclad', gear: { weapon: 'Smokesteel Dagger', accessory: 'Iron Dice' }, abilities: ['Lucky Gambit', 'Smoke Cloak'] },
-            taterSalad: { name: 'Tater_Salad', region: 'rootvale', gear: { weapon: 'Tater Targe', armor: 'Dirtcloak' }, abilities: ['Spud Shield', 'Harvest Haste'] },
-            noodles: { name: 'Noodles', region: 'rolling', gear: { weapon: 'Cue of Shame', armor: 'Tattered Cloth' }, abilities: ['Swift Roll', 'Lucky Break'] },
-            chunks: { name: 'Chunks', region: 'frostfang', gear: { weapon: 'Frostbite Bow', armor: 'Snowbear Pelt' }, abilities: ['Icy Tracking', 'Frost Resilience'] }
-        };
+    // Game state
+    let player = null;
+    let health = 100;
+    let inventory = [];
+    let location2 = null;
+    let energy = 100;
+    let musicPlaying = false;
+    let inCombat = false;
+    let currentEnemy = null;
+    let isGambling = false; // New: Track gambling state
+    let eddieNumber = null; // New: Eddie’s secret number
 
-        // Pixel art for characters
-        function drawCharacterIcon(ctx, char, x, y) {
-            ctx.fillStyle = '#a68b5c';
-            ctx.fillRect(x, y, 16, 24); // Body
-            if (char.gear.weapon === 'Sunblade') ctx.fillStyle = '#ffd700'; // Gold for Sunblade
-            else if (char.gear.weapon === 'Lute of Shaft') ctx.fillStyle = '#d4a017'; // Brown for lute
-            else if (char.gear.weapon === 'Thunderaxe') ctx.fillStyle = '#808080'; // Gray for axe
-            else if (char.gear.weapon === 'Molten Hammer') ctx.fillStyle = '#ff4500'; // Red for hammer
-            else if (char.gear.weapon === 'Smokesteel Dagger') ctx.fillStyle = '#4a4a4a'; // Dark gray for dagger
-            else if (char.gear.weapon === 'Tater Targe') ctx.fillStyle = '#d2b48c'; // Brown for shield
-            else if (char.gear.weapon === 'Cue of Shame') ctx.fillStyle = '#808080'; // Gray for cue
-            else if (char.gear.weapon === 'Frostbite Bow') ctx.fillStyle = '#e0f0ff'; // Light blue for bow
-            ctx.fillRect(x + 8, y - 8, 8, 8); // Weapon/icon
+    const biomes = {
+      frostfang: { name: 'Frostfang Peaks', enemies: ['Frost Wolf'], connections: ['mistpeak'] },
+      sunken: { name: 'Sunken Ruins', enemies: ['Sea Serpent'], connections: ['crystalreach'] },
+      mistpeak: { name: 'Mistpeak Highlands', enemies: ['Mist Wraith'], connections: ['frostfang', 'meadowview'] },
+      thornwick: { name: 'Thornwick Forest', enemies: ['Gator'], connections: ['meadowview', 'shadowvale'] },
+      meadowview: { name: 'Meadowview Plains', enemies: ['Bandit'], connections: ['mistpeak', 'thornwick'] },
+      shadowvale: { name: 'Shadowvale Marshes', enemies: ['Shadow Stalker'], connections: ['thornwick', 'crystalreach'] },
+      crystalreach: { name: 'Crystalreach Caverns', enemies: ['Crystal Golem'], connections: ['sunken', 'shadowvale'] },
+    };
+
+    const characters = {
+      cresto: { name: 'Cresto', region: 'frostfang', health: 80, luck: 10, abilities: ['Frost Strike', 'Ice Shield'], level: 1, experience: 0 },
+      wren: { name: 'Wren', region: 'sunken', health: 90, luck: 15, abilities: ['Wave Song', 'Tidal Wave'], level: 1, experience: 0 },
+      chunks: { name: 'Chunks', region: 'thornwick', health: 70, luck: 5, abilities: ['Gator Grapple', 'Noodle Nudge'], level: 1, experience: 0 },
+      gamblineddie: { name: 'Gamblin’ Eddie', region: 'thornwick', health: 75, luck: 20, abilities: ['Coin Toss', 'Lucky Dodge'], level: 1, experience: 0 },
+      caseadilla: { name: 'Caseadilla', region: 'meadowview', health: 85, luck: 8, abilities: ['Barrage Blast', 'Trench Defense'], level: 1, experience: 0 },
+      noodles: { name: 'Noodles', region: 'mistpeak', health: 70, luck: 12, abilities: ['Talent Twirl', 'Questionable Guard'], level: 1, experience: 0 },
+      nameistom: { name: 'Nameistom', region: 'shadowvale', health: 80, luck: 15, abilities: ['Chaos Clash', 'Wild Ruckus'], level: 1, experience: 0 },
+      domexplosion: { name: 'DomeXplosion', region: 'crystalreach', health: 82, luck: 10, abilities: ['Shaft Slam', 'Boom Buffer'], level: 1, experience: 0 },
+    };
+
+    const npcs = {
+      cresto: { name: 'Cresto', location: 'frostfang', description: 'A ranger with a Stickball Sub.' },
+      wren: { name: 'Wren', location: 'sunken', description: 'A knight offering a Fried Fish.' },
+      chunks: { name: 'Chunks', location: 'thornwick', description: 'An adventurer with a Crystal Shard.' },
+      gamblineddie: { name: 'Gamblin’ Eddie', location: 'thornwick', description: 'A gambler with BITCORRRRNNNNNN to win.' },
+      caseadilla: { name: 'Caseadilla', location: 'meadowview', description: 'A soldier handing out a Healing Potion.' },
+      noodles: { name: 'Noodles', location: 'mistpeak', description: 'A performer asking "Are you talented?" with a Gilded Horn.' },
+      nameistom: { name: 'Nameistom', location: 'shadowvale', description: 'A wildcard tossing a Shadow Cloak.' },
+      domexplosion: { name: 'DomeXplosion', location: 'crystalreach', description: 'A demolitionist shouting "That’s a lot of shaft!" with a Frostbite Bow.' },
+    };
+
+    const enemies = {
+      'Frost Wolf': { health: 50, damage: 10 },
+      'Sea Serpent': { health: 60, damage: 12 },
+      'Mist Wraith': { health: 40, damage: 8 },
+      'Gator': { health: 70, damage: 15 },
+      'Bandit': { health: 45, damage: 10 },
+      'Shadow Stalker': { health: 55, damage: 11 },
+      'Crystal Golem': { health: 80, damage: 18 },
+    };
+
+    const items = {
+      'Stickball Sub': { type: 'consumable', heal: 20 },
+      'Fried Fish': { type: 'consumable', heal: 15 },
+      'Crystal Shard': { type: 'weapon', damage: 18 },
+      'Healing Potion': { type: 'consumable', heal: 30 },
+      'BITCORRRRNNNNNN': { type: 'currency', value: 10 },
+      'Gilded Horn': { type: 'accessory' },
+      'Shadow Cloak': { type: 'accessory', luckBonus: 5 },
+      'Frostbite Bow': { type: 'weapon', damage: 14 },
+    };
+
+    // DOM elements
+    const gameText = document.getElementById('game-text');
+    const playerInput = document.getElementById('player-input');
+    const inputForm = document.getElementById('input-form');
+    const actionButtons = document.querySelector('.action-buttons');
+    const actionList = document.getElementById('action-list');
+    const map = document.getElementById('map');
+    const npcsDiv = document.getElementById('npcs');
+    const backgroundMusic = document.getElementById('backgroundMusic');
+    const musicToggle = document.getElementById('music-toggle');
+
+    // Functions
+    function updateText(text, type = 'normal') {
+      let color = '#000000';
+      switch (type) {
+        case 'success': color = '#90ee90'; break;
+        case 'danger': color = '#ff6347'; break;
+        case 'warning': color = '#ffff99'; break;
+      }
+      console.log('Updating text:', text);
+      if (gameText) {
+        const lines = text.split('\n');
+        let currentLine = 0;
+        const delay = 500;
+
+        function displayNextLine() {
+          if (currentLine < lines.length) {
+            gameText.innerHTML += `<span style="color: ${color}">${lines[currentLine]}</span><br>`;
+            gameText.scrollTop = gameText.scrollHeight;
+            currentLine++;
+            setTimeout(displayNextLine, delay);
+          }
+        }
+        displayNextLine();
+      }
+    }
+
+    function updateStatus() {
+      console.log('Updating status');
+      const statusDiv = document.createElement('div');
+      statusDiv.id = 'status';
+      statusDiv.style.marginTop = '10px';
+      statusDiv.style.color = '#000000';
+      statusDiv.style.background = '#FFFFFF';
+      statusDiv.style.padding = '10px';
+      statusDiv.style.border = '2px solid #FFA500';
+      statusDiv.style.textShadow = '1px 1px 1px #000000';
+      statusDiv.innerHTML = `
+        Status: ${player?.name || 'No character selected'} | Level: ${player?.level || 1} | Health: ${health} | Energy: ${player?.energy || 100} | Luck: ${player?.luck || 0} | Location: ${biomes[location2]?.name || 'None'} | Weapon: ${player?.equippedWeapon || 'None'} | Accessory: ${player?.equippedAccessory || 'None'} | Inventory: ${inventory.map(i => `${i.name} (x${i.count})`).join(', ') || 'Empty'}
+      `;
+      const container = document.querySelector('.container');
+      const existingStatus = document.getElementById('status');
+      if (existingStatus) container?.removeChild(existingStatus);
+      if (container) container.appendChild(statusDiv);
+      listAvailableActions();
+      updateMap();
+      updateNPCs();
+    }
+
+    function updateMap() {
+      if (!player || !location2) {
+        if (map) map.innerHTML = '<p>Select a character to see the map of Bushrealm!</p>';
+        return;
+      }
+      const currentBiome = biomes[location2].name;
+      const nearby = biomes[location2].connections.map(key => biomes[key].name).join(', ');
+      if (map) {
+        map.innerHTML = `
+          <p>Map of Bushrealm:</p>
+          <p>[Current: ${currentBiome}]</p>
+          <p>Nearby: ${nearby}</p>
+        `;
+      }
+    }
+
+    function updateNPCs() {
+      const npcList = Object.values(npcs).map(npc => 
+        `${npc.name} - ${biomes[npc.location].name}: ${npc.description}`
+      ).join('<br>');
+      if (npcsDiv) {
+        npcsDiv.innerHTML = `<p>NPCs of Bushrealm:</p><p>${npcList}</p>`;
+      }
+    }
+
+    function selectCharacter(char) {
+      console.log('Selecting character:', char);
+      if (characters[char]) {
+        player = { ...characters[char], energy: 100, equippedWeapon: null, equippedAccessory: null };
+        health = player.health;
+        location2 = player.region;
+        inventory = [];
+        updateText(`You are ${player.name}, ${
+          player.region === 'frostfang' ? 'ranger' :
+          player.region === 'sunken' ? 'knight' :
+          player.region === 'meadowview' ? 'soldier' :
+          player.region === 'mistpeak' ? 'performer' :
+          player.region === 'shadowvale' ? 'wildcard' :
+          player.region === 'crystalreach' ? 'demolitionist' : 'adventurer'
+        } of the ${biomes[location2].name}, seeking glory in Bushrealm Adventure!`, 'success');
+        updateStatus();
+      } else {
+        updateText('Invalid character name. Try "cresto", "wren", "chunks", "gamblineddie", "caseadilla", "noodles", "nameistom", or "domexplosion".', 'danger');
+      }
+    }
+
+    function toggleMusic() {
+      if (musicPlaying) {
+        backgroundMusic.pause();
+        musicPlaying = false;
+        musicToggle.textContent = 'Enable Background Music';
+        updateText('Background music paused in Bushrealm Adventure.', 'warning');
+      } else {
+        backgroundMusic.play().catch(e => {
+          console.warn(`Background music playback failed: ${e.message}.`);
+          updateText('Failed to play background music in Bushrealm Adventure.', 'danger');
+        });
+        musicPlaying = true;
+        musicToggle.textContent = 'Toggle Background Music';
+        updateText('Background music playing in Bushrealm Adventure.', 'success');
+      }
+    }
+
+    function listAvailableActions() {
+      if (!player || !location2) {
+        if (actionList) actionList.innerHTML = '<p>Select a character to see available actions in Bushrealm Adventure!</p>';
+        return;
+      }
+      const actions = [];
+      actions.push('Available Actions in Bushrealm Adventure (Type or Click):');
+      actions.push('- go wilds: Explore the wilds of Bushrealm.');
+      actions.push('- go [biome]: Travel to a nearby location (e.g., "go meadowview").');
+      actions.push('- rest: Rest to recover health and energy.');
+      actions.push('- saveGame: Save your progress in Bushrealm Adventure.');
+      actions.push('- loadGame: Load a saved game.');
+      actions.push('- viewQuests: Check your active quests.');
+      actions.push('- toggleMusic: Toggle background music in Bushrealm Adventure.');
+      for (let key in npcs) {
+        if (npcs[key].location === location2 && player.name !== npcs[key].name) {
+          actions.push(`- talk ${key}: Speak with ${npcs[key].name}.`);
+        }
+      }
+      if (isGambling) {
+        actions.push('- guess [number]: Guess Eddie’s number (1-5) to win BITCORRRRNNNNNN.');
+      }
+      if (biomes[location2]?.enemies.length > 0 && !inCombat) {
+        actions.push('- fight: Engage enemies in ' + biomes[location2].name + '.');
+      }
+      if (inCombat) {
+        actions.push('- fight: Continue attacking the enemy.');
+        actions.push('- flee: Attempt to flee from combat.');
+      }
+      if (inventory.length > 0) {
+        actions.push('- use [item]: Use an item from your inventory (e.g., "use Stickball Sub").');
+      }
+      if (actionList) actionList.innerHTML = '<p>' + actions.join('<br>- ') + '</p>';
+    }
+
+    function addToInventory(itemName) {
+      const item = items[itemName];
+      if (!item) {
+        console.error(`Item ${itemName} not found in items list`);
+        return;
+      }
+      const existingItem = inventory.find(i => i.name === itemName);
+      if (existingItem) {
+        existingItem.count = (existingItem.count || 1) + 1;
+      } else {
+        inventory.push({ name: itemName, count: 1 });
+      }
+      updateText(`Added ${itemName} to your inventory!`, 'success');
+      updateStatus();
+    }
+
+    function fightEnemy(enemyName) {
+      if (!currentEnemy) {
+        currentEnemy = { ...enemies[enemyName], currentHealth: enemies[enemyName].health, name: enemyName };
+        inCombat = true;
+        updateText(`A wild ${currentEnemy.name} appears! Combat begins...\n${currentEnemy.name} Health: ${currentEnemy.currentHealth}`, 'danger');
+      }
+
+      let playerDamage = Math.floor(Math.random() * 10) + 5 + (player.luck / 5);
+      if (player.name === 'Nameistom') playerDamage = Math.floor(Math.random() * 20) + 5;
+      if (player.equippedWeapon) playerDamage += items[player.equippedWeapon].damage || 0;
+      let enemyDamage = currentEnemy.damage;
+
+      setTimeout(() => {
+        updateText(`${player.name} uses ${player.abilities[0]} dealing ${playerDamage} damage!${player.name === 'Nameistom' && Math.random() < 0.5 ? ' Nameistom laughs maniacally!' : ''}`, 'success');
+        currentEnemy.currentHealth -= playerDamage;
+        if (currentEnemy.currentHealth <= 0) {
+          updateText(`The ${currentEnemy.name} is defeated! You gain 20 experience.`, 'success');
+          player.experience += 20;
+          if (player.experience >= player.level * 50) {
+            player.level++;
+            player.experience = 0;
+            updateText(`${player.name} leveled up to Level ${player.level}!`, 'success');
+          }
+          inCombat = false;
+          currentEnemy = null;
+          updateStatus();
+          return;
         }
 
-        // Draw character icons for selection
-        Object.keys(characters).forEach(char => {
-            const iconCanvas = document.getElementById(`${char}Icon`);
-            const iconCtx = iconCanvas.getContext('2d');
-            drawCharacterIcon(iconCtx, characters[char], 8, 8);
-        });
+        setTimeout(() => {
+          let extraText = '';
+          if (player.name === 'Caseadilla') extraText = ' Caseadilla yells "Ohh nooo!"';
+          else if (player.name === 'Noodles') extraText = ' Noodles asks, "Are you talented?"';
+          else if (player.name === 'Nameistom' && Math.random() < 0.5) extraText = ' Nameistom cackles wildly!';
+          else if (player.name === 'DomeXplosion') extraText = ' DomeXplosion shouts, "That’s a lot of shaft!"';
+          updateText(`${currentEnemy.name} attacks, dealing ${enemyDamage} damage!${extraText}`, 'danger');
+          health -= enemyDamage;
+          if (health <= 0) {
+            updateText(`You’ve been defeated by the ${currentEnemy.name}! Game over...`, 'danger');
+            health = 0;
+            inCombat = false;
+            currentEnemy = null;
+            updateStatus();
+            return;
+          }
 
-        // Pixel art for items
-        const itemIcons = {
-            'Sunblade': { color: '#ffd700', shape: 'sword' },
-            'Marshscale Armor': { color: '#2f4f2f', shape: 'armor' },
-            'Lute of Shaft': { color: '#d4a017', shape: 'lute' },
-            'Evergreen Cloak': { color: '#228b22', shape: 'cloak' },
-            'Thunderaxe': { color: '#808080', shape: 'axe' },
-            'Raincloak': { color: '#808080', shape: 'cloak' },
-            'Molten Hammer': { color: '#ff4500', shape: 'hammer' },
-            'Emberplate Armor': { color: '#8b0000', shape: 'armor' },
-            'Smokesteel Dagger': { color: '#4a4a4a', shape: 'dagger' },
-            'Iron Dice': { color: '#ffd700', shape: 'dice' },
-            'Tater Targe': { color: '#d2b48c', shape: 'shield' },
-            'Dirtcloak': { color: '#8b4513', shape: 'cloak' },
-            'Cue of Shame': { color: '#808080', shape: 'cue' },
-            'Tattered Cloth': { color: '#a68b5c', shape: 'cloak' },
-            'Frostbite Bow': { color: '#e0f0ff', shape: 'bow' },
-            'Snowbear Pelt': { color: '#4a2f1a', shape: 'armor' },
-            'Stickball Sub': { color: '#d4a017', shape: 'sub' },
-            'Fried Fish': { color: '#d4a017', shape: 'fish' }
-        };
+          updateText(`Your Health: ${health}\n${currentEnemy.name} Health: ${currentEnemy.currentHealth}\nFight again or flee?`, 'warning');
+          updateStatus();
+        }, 1000);
+      }, 1000);
+    }
 
-        function drawItem(ctx, item, x, y) {
-            ctx.fillStyle = itemIcons[item]?.color || '#808080';
-            if (itemIcons[item]?.shape === 'sword') ctx.fillRect(x + 20, y + 10, 10, 30);
-            else if (itemIcons[item]?.shape === 'armor') ctx.fillRect(x + 15, y + 5, 20, 35);
-            else if (itemIcons[item]?.shape === 'lute') ctx.fillRect(x + 15, y + 15, 20, 20);
-            else if (itemIcons[item]?.shape === 'cloak') ctx.fillRect(x + 10, y + 10, 30, 25);
-            else if (itemIcons[item]?.shape === 'axe') ctx.fillRect(x + 20, y + 5, 10, 35);
-            else if (itemIcons[item]?.shape === 'hammer') ctx.fillRect(x + 20, y + 10, 10, 30);
-            else if (itemIcons[item]?.shape === 'dagger') ctx.fillRect(x + 22, y + 10, 6, 30);
-            else if (itemIcons[item]?.shape === 'dice') ctx.fillRect(x + 18, y + 15, 14, 14);
-            else if (itemIcons[item]?.shape === 'shield') ctx.fillRect(x + 15, y + 5, 20, 35);
-            else if (itemIcons[item]?.shape === 'cue') ctx.fillRect(x + 20, y + 10, 10, 30);
-            else if (itemIcons[item]?.shape === 'bow') ctx.fillRect(x + 15, y + 15,Sorry about that, something didn't go as planned. Please try again, and if you're still seeing this message, go ahead and restart the app.
+    // Music toggle event
+    if (musicToggle) musicToggle.addEventListener('click', toggleMusic);
+
+    // Handle player input
+    inputForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const command = playerInput.value.trim().toLowerCase();
+      playerInput.value = '';
+      console.log('Player command:', command);
+
+      if (!player && !command.startsWith('select')) {
+        updateText('Please select a character first using "select [name]" (e.g., "select cresto").', 'warning');
+        return;
+      }
+
+      if (command.startsWith('select ')) {
+        const charName = command.split(' ')[1];
+        selectCharacter(charName);
+        return;
+      }
+
+      if (inCombat && command !== 'fight' && command !== 'flee') {
+        updateText('You’re in combat! Use "fight" to attack or "flee" to escape.', 'warning');
+        return;
+      }
+
+      if (isGambling && !command.startsWith('guess ')) {
+        updateText("Gamblin’ Eddie’s waiting! Guess a number with 'guess [number]' (1-5).", 'warning');
+        return;
+      }
+
+      switch (true) {
+        case command === 'go wilds':
+          updateText(`You venture into the wilds of ${biomes[location2].name}... something stirs in the distance.`, 'success');
+          break;
+        case command.startsWith('go '):
+          const targetBiome = command.split(' ')[1];
+          const biomeKey = Object.keys(biomes).find(key => 
+            key === targetBiome || biomes[key].name.toLowerCase().replace(/\s/g, '') === targetBiome
+          );
+          if (biomeKey && biomes[location2].connections.includes(biomeKey)) {
+            location2 = biomeKey;
+            updateText(`You travel to ${biomes[location2].name}.`, 'success');
+            updateStatus();
+          } else {
+            updateText('You can’t travel there from here! Check the map.', 'warning');
+          }
+          break;
+        case command === 'rest':
+          health = Math.min(100, health + 20);
+          player.energy = Math.min(100, player.energy + 30);
+          updateText('You rest, feeling refreshed. Health and energy restored!', 'success');
+          updateStatus();
+          break;
+        case command === 'fight':
+          if (!inCombat && biomes[location2]?.enemies.length > 0) {
+            const enemy = biomes[location2].enemies[0];
+            fightEnemy(enemy);
+          } else if (inCombat && currentEnemy) {
+            fightEnemy(currentEnemy.name);
+          } else {
+            updateText('No enemies to fight here!', 'warning');
+          }
+          break;
+        case command === 'flee':
+          if (inCombat) {
+            const escapeChance = 0.5 + (player.luck / 100);
+            if (Math.random() < escapeChance) {
+              updateText('You successfully flee from combat!', 'success');
+              inCombat = false;
+              currentEnemy = null;
+            } else {
+              let extraText = '';
+              if (player.name === 'Caseadilla') extraText = ' Caseadilla yells "Ohh nooo!"';
+              else if (player.name === 'Noodles') extraText = ' Noodles asks, "Are you talented?"';
+              else if (player.name === 'Nameistom' && Math.random() < 0.5) extraText = ' Nameistom flails wildly!';
+              else if (player.name === 'DomeXplosion') extraText = ' DomeXplosion shouts, "That’s a lot of shaft!"';
+              updateText(`You failed to flee! The enemy strikes again...${extraText}`, 'danger');
+              const enemyDamage = currentEnemy.damage;
+              health -= enemyDamage;
+              if (health <= 0) {
+                updateText(`You’ve been defeated while fleeing! Game over...`, 'danger');
+                health = 0;
+                inCombat = false;
+                currentEnemy = null;
+              }
+              updateStatus();
+            }
+          } else {
+            updateText('You’re not in combat to flee from!', 'warning');
+          }
+          break;
+        case command === 'toggleMusic':
+          toggleMusic();
+          break;
+        case command.startsWith('guess '):
+          if (!isGambling) {
+            updateText("You’re not gambling yet! Talk to Gamblin’ Eddie first.", 'warning');
+            break;
+          }
+          const guess = parseInt(command.split(' ')[1]);
+          if (isNaN(guess) || guess < 1 || guess > 5) {
+            updateText("Gamblin’ Eddie frowns, 'That’s not 1 to 5, pal! Try again.'", 'warning');
+            break;
+          }
+          if (guess === eddieNumber) {
+            updateText("Gamblin’ Eddie smirks, 'You got it, slick!' and hands over some BITCORRRRNNNNNN.", 'success');
+            addToInventory('BITCORRRRNNNNNN');
+          } else {
+            updateText(`Gamblin’ Eddie laughs, "Nope, it was ${eddieNumber}! Better luck next time!"`, 'danger');
+          }
+          isGambling = false;
+          eddieNumber = null;
+          updateStatus();
+          break;
+        case command.startsWith('talk '):
+          const npcName = command.split(' ')[1];
+          if (npcs[npcName] && npcs[npcName].location === location2 && player.name !== npcs[npcName].name) {
+            const npc = npcs[npcName];
+            if (npcName === 'cresto') {
+              updateText(`${npc.name} says, "Hey Back - Take this!" and hands you a Stickball Sub.`, 'success');
+              addToInventory('Stickball Sub');
+            } else if (npcName === 'wren') {
+              updateText(`${npc.name} says, "Yooo take this, you’re gonna need it!" and hands you a Fried Fish.`, 'success');
+              addToInventory('Fried Fish');
+            } else if (npcName === 'chunks') {
+              updateText(`${npc.name} grins, "Found this!" and tosses you a Crystal Shard.`, 'success');
+              addToInventory('Crystal Shard');
+            } else if (npcName === 'gamblineddie') {
+              if (!isGambling) {
+                isGambling = true;
+                eddieNumber = Math.floor(Math.random() * 5) + 1;
+                updateText(`${npc.name} sizes you up, "Pick a number between 1 and 5, hotshot! Type 'guess [number]' to roll the dice!"`, 'warning');
+              } else {
+                updateText(`${npc.name} snaps, "Hey, guess already! 1 to 5, let’s go!"`, 'warning');
+              }
+            } else if (npcName === 'caseadilla') {
+              updateText(`${npc.name} says, "Ohh noooo..... you look like you could use this!" and hands you a Healing Potion.`, 'success');
+              addToInventory('Healing Potion');
+            } else if (npcName === 'noodles') {
+              updateText(`${npc.name} twirls, "Are you talented?" and hands you a Gilded Horn.`, 'success');
+              addToInventory('Gilded Horn');
+            } else if (npcName === 'nameistom') {
+              updateText(`${npc.name} ${Math.random() < 0.5 ? 'cackles and tosses' : 'trips, flinging'} you a Shadow Cloak!`, 'success');
+              addToInventory('Shadow Cloak');
+            } else if (npcName === 'domexplosion') {
+              updateText(`${npc.name} booms, "That’s a lot of shaft!" and hands you a Frostbite Bow.`, 'success');
+              addToInventory('Frostbite Bow');
+            }
+          } else {
+            updateText('No such NPC here or you can’t talk to yourself! Check the NPC list.', 'warning');
+          }
+          break;
+        default:
+          updateText('Unknown command. Type a valid action (see below).', 'danger');
+      }
+    });
+  </script>
+</body>
+</html>
